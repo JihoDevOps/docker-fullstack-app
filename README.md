@@ -637,10 +637,87 @@ MySQL이 Docker 환경이 아닌 AWS RDS 환경으로 변경한다.
 
 ### 3. GitHub에 소스 코드 올리기
 
-
+[GitHub Repository](https://github.com/JihoDevOps/docker-fullstack-app)
 
 ### 4. Travis CI Steps
+
+1.  GitHub에 소스 코드 Push
+2.  Travis CI가 자동으로 코드를 Clone
+3.  Clone 한 코드를 테스트
+4.  테스트 성공 시 Docker Image Build
+5.  빌드된 이미지들을 DockerHub로 업로드
+6.  AWS EB에 DockerHub에 이미지를 올렸다고 알림
+7.  AWS EB에서 DockerHub에 있는 이미지를 가져와 배포
+
+5번에서 빌드된 이미지를 DockerHub에 올리고 AWS가 가져가므로,
+EB 내에서 다시 빌드작업을 수행하지 않아도 된다.
+DockerHub에서 유명한 이미지들을 다운받을 수 있고,
+자신이 만든 이미지도 업로드할 수 있다.
+
+1.  [Travis CI 사이트](https://www.travis-ci.com)로 이동
+2.  Travis 홈페이지에서 해당 저장소를 활성화
+    > Travis가 업데이트 되면서 방식이 조금 다름
+
 ### 5. travis yml 파일 작성하기
+
+1.  `.travis.yml` 파일 생성
+2.  Test 수행 준비
+    -   애플리케이션이 도커 환경에서 실행하므로
+        Travis CI에게 도커 환경으로 만든다고 선언
+    -   구성된 도커 환경에서 dockerfile.dev를 이용하여 Image 생성
+3.  Test 수행
+4.  모든 프로젝트 운영버전 이미지 빌드
+    -   테스트 성공 시 각 프로젝트의 운영버전 이미지 빌드하는 설정
+5.  빌드된 이미지를 도커허브에 업로드
+    -   도커허브에 빌드된 이미지를 넣어주기 위해 도커허브에 로그인
+    -   빌드된 이미지 업로드
+6.  배포
+    -   AWS EB가 업데이트 된 이미지를 가져와 배포할 수 있게 설정
+
+#### .travis.yml
+
+```yml
+# Define project language
+language: generic
+
+# Require permission
+sudo: required
+
+# Announce services type to Travis CI
+services:
+  - docker
+
+before_install:
+  # Build test image
+  - docker build -t "$DOCKER_HUB_ID"/react-test-app -f ./frontend/dockerfile.dev ./frontend
+
+script:
+  # Run test
+  - docker run -e CI=true "$DOCKER_HUB_ID"/react-test-app npm run test
+
+after_success:
+  # Build images
+  - docker build -t "$DOCKER_HUB_ID"/docker-frontend ./frontend
+  - docker build -t "$DOCKER_HUB_ID"/docker-backend ./backend
+  - docker build -t "$DOCKER_HUB_ID"/docker-nginx ./nginx
+  # Sign in DockerHub
+  - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_ID" --password-stdin
+  # Push in DockerHub
+  - docker push "$DOCKER_HUB_ID"/docker-frontend
+  - docker push "$DOCKER_HUB_ID"/docker-backend
+  - docker push "$DOCKER_HUB_ID"/docker-nginx
+```
+
+#### Travis CI에서 환경변수 설정
+
+Go Travis CI →
+Select Repository →
+Click settings →
+Add Environment Variables
+([link](https://app.travis-ci.com/github/JihoDevOps/docker-fullstack-app/settings))
+
+환경변수 설정 후 git push 해서 테스트
+
 ### 6. Dockerrun aws json에 대하여
 ### 7. Dockerrun aws json 파일 작성하기
 ### 8. 다중 컨테이너 앱을 위한 Elastic Beanstalk 환경 생성
