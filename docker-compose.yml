@@ -2,27 +2,29 @@ version: "2.4"
 services:
   frontend:
     image: jihogrammer/docker-frontend
-    # build:
-    #   dockerfile: dockerfile.dev
-    #   context: ./frontend
     volumes:
       - /app/node_modules
       - ./frontend:/app
     stdin_open: true
+    mem_limit: 128m
+    # build:
+    #   dockerfile: dockerfile.dev
+    #   context: ./frontend
   nginx:
     restart: always
     image: jihogrammer/docker-nginx
+    ports:
+      - "80:80"
+    links:
+      - frontend
+      - backend
+    mem_limit: 128m
     # build:
     #   dockerfile: dockerfile
     #   context: ./nginx
-    ports:
-      - "3000:80"
   backend:
     image: jihogrammer/docker-backend
     container_name: app_backend
-    # build:
-    #   dockerfile: dockerfile.dev
-    #   context: ./backend
     volumes:
       - /app/node_modules
       - ./backend:/app
@@ -32,3 +34,7 @@ services:
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: myapp
       MYSQL_PORT: 3306
+    mem_limit: 128m
+    # build:
+    #   dockerfile: dockerfile.dev
+    #   context: ./backend
