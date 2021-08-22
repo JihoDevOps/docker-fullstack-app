@@ -57,7 +57,7 @@ Client의 요청은 Proxy 서버가 받아 로드 밸런싱과 유사한 기능�
 
 1.  `npm init`으로 backend 폴더에 Project를 생성한다.
 2.  `package.json` 파일을 수정한다.
-    ```json
+    ```js
     {
       "name": "backend",
       "version": "1.0.0",
@@ -716,15 +716,298 @@ Click settings →
 Add Environment Variables
 ([link](https://app.travis-ci.com/github/JihoDevOps/docker-fullstack-app/settings))
 
-환경변수 설정 후 git push 해서 테스트
+#### 환경변수 설정 후 git push 해서 테스트
+
+-   테스트 코드 적절하게 수정
+-   아직 AWS 연결은 하지 않았으므로
+    정상적으로 DockerHub에 이미지가 업로드 되었는지
+    [확인](https://hub.docker.com)
 
 ### 6. Dockerrun aws json에 대하여
+
+`dockerrun.aws.json` 파일을 통해
+AWS Elastic Beanstalk에서 애플리케이션을 작동할 수 있다.
+
+#### 필요성
+
+하나의 dockerfile은 EB가 스스로 처리할 수 있다.
+하지만 지금 다루는 프로젝트처럼
+이미지가 여러 개인 경우 따로 설정이 필요하다.
+
+이번에는 Node, MySQL, Nginx 등을 위한 dockerfile이 각각 존재한다.
+따라서 EB가 어떤 행동을 취할지 설정해야 한다.
+
+#### 정의
+
+Docker 컨테이너 세트를 EB 애플리케이션으로 배포하는 방법을 설명하는
+Elastic Beanstalk 고유의 JSON 파일이다.
+`Dockerrun.aws.json` 파일을 멀티컨테이너 Docker 환경에서 사용한다.
+
+`Dockerrun.aws.json`은 환경에서 각 컨테이너
+인스턴스(Docker 컨테이너를 호스트하는 Amazon EC2 인스턴스)에
+배포할 컨테이너 및
+탑재할 컨테이너의 호스트 인스턴스에서 생성할 데이터 볼륨을 설명한다.
+
+#### 구조
+
+```bash
++ EB
+  + ECS (Elastic Container Service)
+    + Task
+      + Container
+```
+
+Task Definition, Container Definition을 명시해야 한다.
+
+#### Task Definition
+
+-   작업의 각 컨테이너에 사용할 도커 이미지
+-   각 작업 또는 작업 내 컨테이너에서 사용할 CPU 및 메모리의 양
+-   사용할 시작 유형으로서 해당 작업이 호스팅되는 인프라를 결정
+-   작업의 컨테이너에 사용할 도커 네트워킹 모드
+-   작업에 사용할 로깅 구성
+-   컨테이너가 종료 또는 실패하더라도 작업이 계속 실행될지 여부
+-   컨테이너 시작 시 컨테이너가 실행할 명령
+-   작업의 컨테이너에서 사용할 데이터 볼륨
+-   작업에서 사용해야 하는 IAM 역할
+
+이 작업 정의를 등록하려면 Container Definition을 명시해야 한다.
+그 Container Definition은 `dockerrun.aws.json`에 명시하여
+Docker Daemon으로 전달된다.
+
 ### 7. Dockerrun aws json 파일 작성하기
+
+1.  `dockerrun.aws.json` 파일 생성
+2.  Container Definitions 작성
+
+#### `
+
+```js
+{
+  // Dockerrun version 2
+  "AWSEBDockerrunVersion": 2,
+  // Define Containers
+  "containerDefinitions": [
+    // Container
+    {
+      "name": "frontend",
+      // Image at DockerHub
+      "image": "jihogrammer/docker-frontend",
+      // Link to other Container
+      // 이름을 이용하여 Docker Compose를 통해 생성된
+      // 다른 컨테이너에서 접근 가능
+      "hostname": "frontend",
+      // If this Container failed, stop or continue
+      // 실패할 경우 작업을 중지하려면 true
+      // 필수적이지 않은 컨테이너는 인스턴스의 나머지 컨테이너에
+      // 영향을 미치지 않고 종료되거나 충돌할 수 있다.
+      "essential": false,
+      // 컨테이너 전용으로 예약할 인스턴스 내 메모리
+      // memory 또는 memoryReservation 중
+      // 하나 또는 모두에 0이 아닌 정수를 지정한다.
+      "memory": 128
+    },
+    {
+      "name": "backend",
+      "image": "jihogrammer/docker-backend",
+      "hostname": "backend",
+      "essential": false,
+      "memory": 128
+    },
+    {
+      "name": "nginx",
+      "image": "jihogrammer/docker-nginx",
+      "hostname": "nginx",
+      "essential": true,
+      // 컨테이너에 있는 네트워크 지점을 호스트에 있는 지점에 매핑
+      "portMappings": [
+        {
+          "hostPort": 80,
+          "containerPort": 80
+        }
+      ],
+      // 연결할 컨테이너의 목록
+      // 연결된 컨테이너는 서로를 검색하고 안전하게 통신 가능
+      "links": ["frontend", "backend"],
+      "memory": 128
+    }
+  ]
+}
+```
+
 ### 8. 다중 컨테이너 앱을 위한 Elastic Beanstalk 환경 생성
+
+-   [docs](https://docs.aws.amazon.com/ko_kr/elasticbeanstalk/latest/dg/create_deploy_docker_v2config.html#create_deploy_docker_v2config_dockerrun)
+-   [link](http://docker-fullstack-app-linux2-env.eba-6b8gngmf.ap-northeast-2.elasticbeanstalk.com)
+
 ### 9. VPC 설정하기
+
+현재까지 운영 환경에서 DB를 위한 설정이 없다.
+따라서 AWS의 RDS를 이용하여 MySQL을 애플리케이션과 연결해야 한다.
+여기서 VPC와 Security Group을 설정해야 한다.
+
+EB 인스턴스가 RDS(MySQL)에 접근하려면 VPC와 Security Group이 필요하다.
+자동으로 연결되지 않으므로, 따로 설정해야 통신을 할 수 있다.
+
+#### VPC
+
+>   Amazon Virtual Private Cloud
+
+AWS 클라우드에서 논리적으로 격리된 공간을 프로비저닝 해서
+고객이 정의하는 가상 네트워크에서 AWS 리소스를 시작할 수 있다.
+
+EC2 인스턴스나 EB 인스턴스 혹은 RDS가 있는 상태에서
+이들을 하나의 그룹 안에서만 접근이 가능하도록 설정한다.
+이를 설정함으로써 다른 아이디로 접근할 수 없도록 보호한다.
+
+EB 인스턴스나 RDS를 생성하면 기본적으로 VPC(default)가 할당된다.
+할당될 때 지역(region)별로 다르게 할당된다.
+현재 기본적으로 할당된 VPC는 EB 인스턴스와 RDS를 포함한다.
+하지만 설정을 따로 하지 않는 이상 서로 통신은 할 수 없다.
+VPC 정보를 확인하기 위해서는 대시보드에서 VPC 검색해서 볼 수 있다.
+
+#### Security Group(보안 그룹)
+
+EC2 인스턴스와 외부 인스턴스 사이의 방화벽 정도로 생각하자.
+
+-   inbound :
+    외부에서 EC2 인스턴스나 EB 인스턴스로 요청을 보내는 트래픽이다.
+    HTTP, HTTPS, SSH 등이 있다.
+-   outbound :
+    EC2 인스턴스나 EB 인스턴스 등에서 외부로 나가는 트래픽이다.
+    파일을 다운로드 하거나
+    inbound로 들어온 트래픽을 처리하여 응답하는 경우도 포함한다.
+
+결론적으로 Security Group이 inbound와 outbound를 통제해서
+트래픽을 열거나 닫을 수 있다.
+
+#### 어떻게 VPC와 Security Group으로 통신하게 설정하는지
+
+VPC 안에 있는 AWS 서비스 간 트래픽을 모두 허용할 수 있도록
+Security Group을 허용한다.
+
 ### 10. MySQL을 위한 AWS RDS 생성하기
+
+우선 `docker-compose.yml`에서 RDS 관련 설정을 지정한다.
+
+```yml
+backend:
+  ...
+  environment:
+    MYSQL_HOST: mysql
+    MYSQL_USER: root
+    MYSQL_ROOT_PASSWORD: root1234
+    MYSQL_DATABASE: myapp
+    MYSQL_PORT: 3306
+```
+
+`db.js`에서 환경변수 읽어오는 설정으로 변경한다.
+
+```js
+const mysql = require("mysql");
+const pool = mysql.createPool({
+    connectionLimit: 10,
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_ROOT_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    port: process.env.MYSQL_PORT
+});
+
+exports.pool = pool;
+```
+
+AWS에서 RDS 생성
+
+-   RDS 검색
+-   RDS 생성
+    -   MySQL 선택
+    -   RDS 이름 설정
+    -   사용자(root) 설정
+    -   기본 DB(myapp) 설정
+
 ### 11. Security Group 생성하기
+
+1.  AWS Console에서 VPC 검색
+2.  Security Group(보안 그룹) 선택
+3.  보안 그룹 생성
+    -   이름 및 설명 작성
+    -   기타 설정은 그대로 둔 채 생성
+4.  인바운드/아웃바운드 규칙 설정
+    -   인바운드 : 외부에서 그룹에 접근할 때
+        -   MySQL 추가를 위해 3306 포트를 연다.
+        -   3번에서 생성한 보안 그룹을 지정한다.
+    -   아웃바운드 : 그룹에서 외부로 나갈 때
+
 ### 12. Security Group 적용하기
+
+#### RDS 설정
+
+-   RDS에서 생성한 MySQL 수정 버튼 클릭하여 보안 그룹 수정
+-   연결 탭에서 생성했던 보안그룹 선택
+-   즉시 적용하여 최종 수정
+
+#### EB 설정
+
+-   적용할 EB 인스턴스에서 구성 > 인스턴스 편집
+-   보안 그룹 추가
+-   Warning은 무시하고 수정
+
 ### 13. EB와 RDS 소통을 위한 환경 변수 설정하기
+
+아직 Elastic Beanstalk 안에 있는 컨테이너들이
+MySQL 인스턴스와 소통할 때 환경변수를 인식하지 못한다.
+그래서 AWS EB에 환경변수를 설정하여 그 문제를 해결한다.
+
+-   적용할 EB 선택
+-   구성에서 소프트웨어 편집
+-   환경 속성에서 환경변수 지정
+    -   AWS RDS에서 생성된 변수(엔드포인트)값 확인
+    -   HOST 이름만 엔드포인트로 사용하고 나머지는 동일하게 지정
+
 ### 14. travis yml 파일 작성하기 (배포 부분)
+
+```yml
+deploy:
+  # 외부 서비스 표시 (s3, elasticbeanstalk, firebase 등)
+  provider: elasticbeanstalk
+  # 현재 사용하고 있는 AWS의 서비스가 위치하고 있는 물리적 장소
+  region: "ap-northeast-2"
+  # 생성한 애플리케이션의 이름
+  app: "docker-fullstack-app"
+  # 생성한 애플리케이션의 환경 이름
+  env: "docker-fullstack-app-Linux2-env"
+  # 해당 elasticbeanstalk를 위한 s3 버켓 이름
+  bucket_name: "elasticbeanstalk-ap-northeast-2-869075270387"
+  # 애플리케이션 이름과 동일하게 설정
+  bucket_path: "docker-fullstack-app"
+  on:
+    branch: master
+```
+
+이렇게 설정하고 끝이 아니다.
+Travis CI가 AWS에 접근할 수 있도록 설정이 필요하다.
+
 ### 15. Travis CI의 AWS 접근을 위한 API Key 생성
+
+소스 파일을 전달하기 위한 접근 요건 설정
+
+-   "GitHub - Travis"는 Travis 홈페이지에서 인증
+-   "Travis - AWS"는 AWS가 제공하는 Secret Key를 지정
+
+7강에서 다룬 내용과 중복된다.
+
+1.  AWS IAM USER 생성
+    -   사용자 이름: docker-fullstack-user
+    -   액세스 유형: 프로그래밍 방식 액세스
+    -   기존 정책 중 "AdministratorAccess-AWSElasticBeanstalk" 지정
+    -   태그는 생략했음
+2. 발급된 Key를 Travis CI에서 환경변수로 설정
+    -   이렇게 지정해야 키값을 노출하지 않는다.
+3. .travis.yml에서 환경변수 매핑
+    ```yml
+    deploy:
+      ...
+      access_key_id: $AWS_ACCESS_KEY
+      secret_access_key: $AWS_SECRET_ACCESS_KEY
+    ```
