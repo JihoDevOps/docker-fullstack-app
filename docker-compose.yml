@@ -1,6 +1,5 @@
 version: 2.4
 services:
-
   frontend:
     image: jihogrammer/docker-frontend
     build:
@@ -10,7 +9,6 @@ services:
       - /app/node_modules
       - ./frontend:/app
     stdin_open: true
-
   nginx:
     restart: always
     image: jihogrammer/docker-nginx
@@ -19,7 +17,6 @@ services:
       context: ./nginx
     ports:
       - "3000:80"
-
   backend:
     image: jihogrammer/docker-backend
     container_name: app_backend
@@ -35,16 +32,3 @@ services:
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: myapp
       MYSQL_PORT: 3306
-
-  # mysql:
-  #   build: ./mysql
-  #   restart: unless-stopped
-  #   container_name: app_mysql
-  #   ports:
-  #     - "3306:3306"
-  #   volumes:
-  #     - ./mysql/mysql_data:/var/lib/mysql
-  #     - ./mysql/sql/:/docker-entrypoint-initdb.d/
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: 1234
-  #     MYSQL_DATABASE: myapp
