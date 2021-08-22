@@ -1,7 +1,8 @@
-version: "3"
+version: 2.4
 services:
 
   frontend:
+    image: jihogrammer/docker-frontend
     build:
       dockerfile: dockerfile.dev
       context: ./frontend
@@ -12,6 +13,7 @@ services:
 
   nginx:
     restart: always
+    image: jihogrammer/docker-nginx
     build:
       dockerfile: dockerfile
       context: ./nginx
@@ -19,6 +21,7 @@ services:
       - "3000:80"
 
   backend:
+    image: jihogrammer/docker-backend
     container_name: app_backend
     build:
       dockerfile: dockerfile.dev
@@ -27,7 +30,7 @@ services:
       - /app/node_modules
       - ./backend:/app
     environment:
-      MYSQL_HOST: mysql
+      MYSQL_HOST: docker-fullstack-mysql.cdlor9chrfkp.ap-northeast-2.rds.amazonaws.com
       MYSQL_USER: root
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: myapp
